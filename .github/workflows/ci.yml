@@ -27,11 +27,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up PHP
+        if: runner.os == 'Linux'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          tools: none
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
-          cache: true
+          cache: false
 
       - name: Build
         run: go build ./...

@@ -171,9 +171,6 @@ foreach ($declared as $className) {
     if ($file === false || strpos(realpath($file), realpath($pkgDir)) !== 0) {
         continue;
     }
-    if (!$rc->isPublic() && !($rc->getModifiers() & ReflectionClass::IS_EXPLICIT_ABSTRACT)) {
-        // internal or non-public
-    }
     // Skip anonymous classes.
     if ($rc->isAnonymous()) continue;
 
