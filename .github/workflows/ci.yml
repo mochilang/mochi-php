@@ -16,8 +16,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.24", "1.25"]
-        os: [ubuntu-latest, macos-latest]
+        go: ["1.24", "stable"]
+        os: [ubuntu-latest]
+      include:
+        - go: stable
+          os: macos-latest
 
     steps:
       - uses: actions/checkout@v4
