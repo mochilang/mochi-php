@@ -37,7 +37,7 @@ PHP program or Composer library
 go get github.com/mochilang/mochi-php
 ```
 
-Requires Go 1.23+.
+Requires Go 1.24+.
 
 ## Packages
 
