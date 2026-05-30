@@ -53,3 +53,15 @@ jobs:
 
       - name: Vet
         run: go vet ./...
+
+      - name: Build (transpiler)
+        working-directory: transpiler
+        run: go build ./...
+
+      - name: Test (transpiler)
+        working-directory: transpiler
+        run: go test ./... -count=1 -race -timeout 120s
+
+      - name: Vet (transpiler)
+        working-directory: transpiler
+        run: go vet ./...

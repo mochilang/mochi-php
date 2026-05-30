@@ -1,0 +1,104 @@
+name: Publish mochi/runtime to Packagist
+
+on:
+  push:
+    tags:
+      - 'v0.*'
+      - 'v1.*'
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  publish:
+    name: Sign, attest, and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify signed tag
+        run: |
+          git tag -v "${{ github.ref_name }}"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          tools: composer
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install runtime deps
+        working-directory: transpiler3/php/runtime
+        run: composer install --no-dev --prefer-dist
+
+      - name: composer audit
+        working-directory: transpiler3/php/runtime
+        run: composer audit
+
+      - name: Import GPG key (if configured)
+        if: ${{ env.GPG_PRIVATE_KEY != '' }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+
+      - name: Build deterministic tarball
+        run: |
+          TAG="${{ github.ref_name }}"
+          TARBALL="mochi-runtime-${TAG}.tar.gz"
+          tar --sort=name \
+              --mtime="$(git log -1 --format=%cI)" \
+              --owner=0 --group=0 --numeric-owner \
+              -czf "$TARBALL" \
+              -C transpiler3/php/runtime \
+              .
+          echo "TARBALL=$TARBALL" >> "$GITHUB_ENV"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: ${{ env.TARBALL }}
+
+      - name: Sign with php-signify (optional)
+        if: ${{ env.PHP_SIGNIFY_SECRET_KEY != '' }}
+        run: |
+          composer global require drupal/php-signify
+          signify -S -s <(echo "$PHP_SIGNIFY_SECRET_KEY") \
+            -m "$TARBALL" -x "${TARBALL}.sig"
+        env:
+          PHP_SIGNIFY_SECRET_KEY: ${{ secrets.PHP_SIGNIFY_SECRET_KEY }}
+
+      - name: Notify Packagist (optional)
+        if: ${{ env.PACKAGIST_TOKEN != '' }}
+        run: |
+          curl -sS -X POST \
+            "https://packagist.org/api/update-package?username=mochi&apiToken=$PACKAGIST_TOKEN" \
+            -d '{"repository":{"url":"https://github.com/mochilang/mochi-php"}}'
+        env:
+          PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
+
+  verify-gate:
+    name: Verify published package
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          tools: composer
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Re-install and audit
+        working-directory: transpiler3/php/runtime
+        run: |
+          composer install --no-dev --prefer-dist
+          composer audit
